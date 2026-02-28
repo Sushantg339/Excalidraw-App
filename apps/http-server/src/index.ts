@@ -123,12 +123,30 @@ app.post('/api/user/room', authMiddleware, async (req , res)=>{
             })
         }
 
-        const room = await prisma.room.create({
-            data : {
-                slug : data.roomName,
-                adminId : req.userId
-            }
+        const isRoom = await prisma.room.findUnique({
+            where : {slug : data.roomName}
         })
+
+        if(isRoom){
+            return res.status(409).json({
+                msg : "room name already taken"
+            })
+        }
+
+        let room
+        try {
+            room = await prisma.room.create({
+                data: {
+                slug: data.roomName,
+                adminId: req.userId
+                }
+            })
+        } catch (e: any) {
+            if (e.code === "P2002") {
+                return res.status(409).json({ msg: "room name already taken" })
+            }
+            throw e
+        }
 
         return res.status(201).json({
             msg : "room created successfully",
@@ -138,6 +156,61 @@ app.post('/api/user/room', authMiddleware, async (req , res)=>{
         console.log(error)
         return res.status(500).json({
             msg : "internal server erroe"
+        })
+    }
+})
+
+
+app.get('/api/chat/:roomId', async(req , res)=>{
+    try {
+        const roomId = Number(req.params.roomId)
+        if (Number.isNaN(roomId)) {
+            return res.status(400).json({ msg: "invalid roomId" })
+        }
+        const messages = await prisma.chat.findMany({
+            where: {
+                roomId: roomId
+            },
+            take: 5,
+            orderBy: {
+                id: "desc"
+            }
+        })
+
+        return res.status(200).json({
+            msg : "meseeges fetched successfully",
+            messages
+        })
+    } catch (error) {
+        console.log(error)
+        return res.status(500).json({
+            msg : "iinternal server error"
+        })
+    }
+})
+
+
+app.get('/api/room/:slug', async (req , res)=>{
+    try {
+        const {slug}: {slug : string} = req.params
+        const room = await prisma.room.findUnique({
+            where : {slug}
+        })
+
+        if(!room){
+            return res.status(404).json({
+                msg : "invalid room name"
+            })
+        }
+
+        return res.status(200).json({
+            msg : "room fetched successfully",
+            room
+        })
+    } catch (error) {
+        console.log(error)
+        return res.status(500).json({
+            msg : "internal server error"
         })
     }
 })
