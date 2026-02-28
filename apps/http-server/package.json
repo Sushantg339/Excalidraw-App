@@ -12,6 +12,7 @@
     "@repo/backend-common": "workspace:*",
     "@repo/common": "workspace:*",
     "@repo/typescript-config": "workspace:*",
+    "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10"
   },
@@ -20,8 +21,9 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@repo/db": "workspace:*",
+    "bcrypt": "^6.0.0",
     "express": "^5.2.1",
-    "@repo/db" : "workspace:*",
     "jsonwebtoken": "^9.0.3"
   }
 }

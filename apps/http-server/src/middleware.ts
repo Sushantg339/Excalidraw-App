@@ -1,11 +1,13 @@
-import { JWT_SECRET } from "@repo/backend-common/config";
 import { RequestHandler } from "express";
 import jwt, { JwtPayload } from 'jsonwebtoken'
+
+
+import { JWT_SECRET } from "@repo/backend-common/config";
 
 declare global{
     namespace Express{
         interface Request{
-            userId : string
+            userId? : string
         }
     }
 }
@@ -26,6 +28,7 @@ export const authMiddleware: RequestHandler = async (req , res , next)=>{
 
         next()
     } catch (error) {
+        console.log(error)
         return res.status(500).json({
             msg : "error in auth middleware"
         })

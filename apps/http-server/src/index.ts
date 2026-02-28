@@ -1,17 +1,23 @@
 import express from 'express'
+import jwt from 'jsonwebtoken'
+import bcrypt from 'bcrypt'
+
+
 import {JWT_SECRET} from '@repo/backend-common/config'
 import {CreateRoomSchema, CreateUserSchema, SigninUserSchema} from '@repo/common/types'
 import {prisma} from '@repo/db/prisma'
-import jwt from 'jsonwebtoken'
 import { authMiddleware } from './middleware'
+
 
 const app = express()
 
-app.post('/api/user/signin', async (req , res)=>{
+app.use(express.json())
+
+app.post('/api/user/signup', async (req , res)=>{
     try {
         const parsed = CreateUserSchema.safeParse(req.body)
         if(!parsed.success){
-            return res.status(411).json({
+            return res.status(400).json({
                 msg : "incorrect schema"
             })
         }
@@ -25,21 +31,22 @@ app.post('/api/user/signin', async (req , res)=>{
         })
 
         if(isUser){
-            return res.status(400).json({
+            return res.status(409).json({
                 msg : "user already exist!"
             })
         }
+
+        const hashedPassword = await bcrypt.hash(data.password, 10)
 
         const user = await prisma.user.create({
             data : {
                 email : data.username,
                 name : data.name,
-                password : data.password,
-                photo : data.photo
+                password : hashedPassword,
             }
         })
 
-        const token = jwt.sign({userId : user.id} , JWT_SECRET)
+        const token = jwt.sign({userId : user.id} , JWT_SECRET, {expiresIn: '7d'})
 
         return res.status(201).json({
             msg : "user created successfully",
@@ -47,15 +54,18 @@ app.post('/api/user/signin', async (req , res)=>{
         })
     } catch (error) {
         console.log(error)
+        return res.status(500).json({
+            msg : "internal server erroe"
+        })
     }
 })
 
-app.post('/api/user/signup', async (req , res)=>{
+app.post('/api/user/signin', async (req , res)=>{
     try {
         const parsed = SigninUserSchema.safeParse(req.body)
         if(!parsed.success){
-            return res.status(411).json({
-                msg : "incorrect schema"
+            return res.status(400).json({
+                msg : "invalid schema"
             })
         }
 
@@ -64,24 +74,34 @@ app.post('/api/user/signup', async (req , res)=>{
         const user = await prisma.user.findUnique({
             where : {
                 email : data.username,
-                password: data.password
             }
         })
 
         if(!user){
-            return res.status(404).json({
-                msg : "user not found"
-            })
+            return res.status(401).json(({
+                msg : "invalid credentials"
+            }))
         }
 
-        const token = jwt.sign({userId : user.id} , JWT_SECRET)
+        const isPasswordValid = await bcrypt.compare(data.password, user.password)
 
-        return res.status(201).json({
+        if(!isPasswordValid){
+            return res.status(401).json(({
+                msg : "invalid credentials"
+            }))
+        }
+
+        const token = jwt.sign({userId : user.id} , JWT_SECRET, {expiresIn: '7d'})
+
+        return res.status(200).json({
             msg : "user logged in successfully",
             token
         })
     } catch (error) {
         console.log(error)
+        return res.status(500).json({
+            msg : "internal server erroe"
+        })
     }
     
 })
@@ -90,12 +110,18 @@ app.post('/api/user/room', authMiddleware, async (req , res)=>{
     try {
         const parsed = CreateRoomSchema.safeParse(req.body)
         if(!parsed.success){
-            return res.status(411).json({
-                msg : "incorrect schema"
+            return res.status(400).json({
+                msg : "invalid schema"
             })
         }
 
         const data = parsed.data
+
+        if(!req.userId){
+            return res.status(401).json({
+                msg : "unauthorized"
+            })
+        }
 
         const room = await prisma.room.create({
             data : {
@@ -110,6 +136,9 @@ app.post('/api/user/room', authMiddleware, async (req , res)=>{
         })
     } catch (error) {
         console.log(error)
+        return res.status(500).json({
+            msg : "internal server erroe"
+        })
     }
 })
 
